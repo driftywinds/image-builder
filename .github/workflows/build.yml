@@ -86,57 +86,46 @@ jobs:
           # Parse comma-separated tags
           IFS=',' read -ra TAG_ARRAY <<< "${{ inputs.tags }}"
           
-          # Initialize arrays for different registries
-          DOCKERHUB_TAGS=""
-          GHCR_TAGS=""
-          QUAY_TAGS=""
+          # Clean up image name (remove any leading/trailing slashes or spaces)
+          IMAGE_NAME=$(echo "${{ inputs.image_name }}" | sed 's|^/||' | sed 's|/$||' | xargs)
+          
+          # Initialize tag list
+          ALL_TAGS=""
           
           # Generate tags for each registry
           for tag in "${TAG_ARRAY[@]}"; do
             # Trim whitespace
             tag=$(echo "$tag" | xargs)
             
+            # Skip empty tags
+            if [[ -z "$tag" ]]; then
+              continue
+            fi
+            
+            # Docker Hub tags
             if [[ "${{ inputs.push_to_dockerhub }}" == "true" ]]; then
-              if [[ -n "$DOCKERHUB_TAGS" ]]; then
-                DOCKERHUB_TAGS="$DOCKERHUB_TAGS,"
+              if [[ -n "$ALL_TAGS" ]]; then
+                ALL_TAGS="$ALL_TAGS,"
               fi
-              DOCKERHUB_TAGS="$DOCKERHUB_TAGS${{ inputs.image_name }}:$tag"
+              ALL_TAGS="$ALL_TAGS$IMAGE_NAME:$tag"
             fi
             
+            # GHCR tags
             if [[ "${{ inputs.push_to_ghcr }}" == "true" ]]; then
-              if [[ -n "$GHCR_TAGS" ]]; then
-                GHCR_TAGS="$GHCR_TAGS,"
+              if [[ -n "$ALL_TAGS" ]]; then
+                ALL_TAGS="$ALL_TAGS,"
               fi
-              GHCR_TAGS="$GHCR_TAGS ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:$tag"
+              ALL_TAGS="${ALL_TAGS}ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$tag"
             fi
             
+            # Quay tags
             if [[ "${{ inputs.push_to_quay }}" == "true" ]]; then
-              if [[ -n "$QUAY_TAGS" ]]; then
-                QUAY_TAGS="$QUAY_TAGS,"
+              if [[ -n "$ALL_TAGS" ]]; then
+                ALL_TAGS="$ALL_TAGS,"
               fi
-              QUAY_TAGS="$QUAY_TAGS quay.io/${{ inputs.image_name }}:$tag"
+              ALL_TAGS="${ALL_TAGS}quay.io/$IMAGE_NAME:$tag"
             fi
           done
-          
-          # Combine all tags
-          ALL_TAGS=""
-          if [[ -n "$DOCKERHUB_TAGS" ]]; then
-            ALL_TAGS="$DOCKERHUB_TAGS"
-          fi
-          if [[ -n "$GHCR_TAGS" ]]; then
-            if [[ -n "$ALL_TAGS" ]]; then
-              ALL_TAGS="$ALL_TAGS,$GHCR_TAGS"
-            else
-              ALL_TAGS="$GHCR_TAGS"
-            fi
-          fi
-          if [[ -n "$QUAY_TAGS" ]]; then
-            if [[ -n "$ALL_TAGS" ]]; then
-              ALL_TAGS="$ALL_TAGS,$QUAY_TAGS"
-            else
-              ALL_TAGS="$QUAY_TAGS"
-            fi
-          fi
           
           echo "tags=$ALL_TAGS" >> $GITHUB_OUTPUT
           echo "Generated tags: $ALL_TAGS"
