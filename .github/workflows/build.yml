@@ -10,7 +10,7 @@ on:
         default: 'https://git.lolcat.ca/lolcat/4get'
       
       image_name:
-        description: 'Docker image name (without registry prefix)'
+        description: 'Docker image name (without registry prefix) (for GitHub only put the image name)'
         required: true
         type: string
         default: 'user/image'
@@ -22,19 +22,19 @@ on:
         default: 'latest'
       
       push_to_dockerhub:
-        description: 'Push to Docker Hub'
+        description: 'Push to Docker Hub (Run with Quay, not GHCR)'
         required: true
         type: boolean
         default: true
       
       push_to_ghcr:
-        description: 'Push to GitHub Container Registry'
+        description: 'Push to GitHub Container Registry (run seperately from the other two)'
         required: true
         type: boolean
         default: true
       
       push_to_quay:
-        description: 'Push to Quay.io'
+        description: 'Push to Quay.io (Run with Dockerhub, not GHCR)'
         required: true
         type: boolean
         default: true
