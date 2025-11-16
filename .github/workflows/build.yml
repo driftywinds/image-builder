@@ -10,7 +10,7 @@ on:
         default: 'https://git.lolcat.ca/lolcat/4get'
       
       image_name:
-        description: 'Docker image name (without registry prefix) (for GitHub only put the image name)'
+        description: 'Docker image name (without registry prefix)'
         required: true
         type: string
         default: 'user/image'
@@ -21,20 +21,26 @@ on:
         type: string
         default: 'latest'
       
+      dockerfile_path:
+        description: 'Path to Dockerfile (relative to repo root, e.g., "Dockerfile" or "docker/Dockerfile")'
+        required: false
+        type: string
+        default: 'auto'
+      
       push_to_dockerhub:
-        description: 'Push to Docker Hub (Run with Quay, not GHCR)'
+        description: 'Push to Docker Hub'
         required: true
         type: boolean
         default: true
       
       push_to_ghcr:
-        description: 'Push to GitHub Container Registry (run seperately from the other two)'
+        description: 'Push to GitHub Container Registry'
         required: true
         type: boolean
         default: true
       
       push_to_quay:
-        description: 'Push to Quay.io (Run with Dockerhub, not GHCR)'
+        description: 'Push to Quay.io'
         required: true
         type: boolean
         default: true
@@ -53,6 +59,37 @@ jobs:
           cd ./target-repo
           echo "REPO_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "REPO_SHORT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      
+      - name: Detect Dockerfile location
+        id: dockerfile
+        run: |
+          cd ./target-repo
+          
+          DOCKERFILE_PATH="${{ inputs.dockerfile_path }}"
+          
+          if [[ "$DOCKERFILE_PATH" == "auto" ]]; then
+            # Auto-detect Dockerfile location
+            if [[ -f "Dockerfile" ]]; then
+              DOCKERFILE_PATH="Dockerfile"
+              echo "Found Dockerfile in root directory"
+            elif [[ -f "docker/Dockerfile" ]]; then
+              DOCKERFILE_PATH="docker/Dockerfile"
+              echo "Found Dockerfile in docker/ directory"
+            else
+              echo "Error: No Dockerfile found in root or docker/ directory"
+              exit 1
+            fi
+          else
+            # Verify the specified Dockerfile exists
+            if [[ ! -f "$DOCKERFILE_PATH" ]]; then
+              echo "Error: Specified Dockerfile not found at: $DOCKERFILE_PATH"
+              exit 1
+            fi
+            echo "Using specified Dockerfile: $DOCKERFILE_PATH"
+          fi
+          
+          echo "path=$DOCKERFILE_PATH" >> $GITHUB_OUTPUT
+          echo "DOCKERFILE_PATH=$DOCKERFILE_PATH" >> $GITHUB_ENV
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -134,6 +171,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./target-repo
+          file: ./target-repo/${{ steps.dockerfile.outputs.path }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -152,6 +190,7 @@ jobs:
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "**Repository:** ${{ inputs.repo_url }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ env.REPO_SHORT_COMMIT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dockerfile:** ${{ steps.dockerfile.outputs.path }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image Name:** ${{ inputs.image_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:** ${{ inputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
