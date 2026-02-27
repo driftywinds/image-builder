@@ -1,0 +1,58 @@
+name: Patch YTLite .deb
+
+on:
+  workflow_dispatch:
+    inputs:
+      deb_url:
+        description: "Direct download URL to the YTLite .deb file"
+        required: true
+        type: string
+      deb_filename:
+        description: "Filename to save the .deb as (e.g. YTLite.deb)"
+        required: false
+        default: "YTLite.deb"
+        type: string
+      output_filename:
+        description: "Output filename for the patched .deb (e.g. YTLite_patched.deb)"
+        required: false
+        default: "YTLite_patched.deb"
+        type: string
+
+jobs:
+  patch:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install dpkg ldid
+
+      - name: Download .deb file
+        run: |
+          echo "[*] downloading ${{ inputs.deb_filename }} from provided URL"
+          curl -L "${{ inputs.deb_url }}" -o "${{ inputs.deb_filename }}"
+          ls -lh "${{ inputs.deb_filename }}"
+
+      - name: Patch .deb with patch_ytlite.py
+        run: |
+          python3 patch_ytlite.py "${{ inputs.deb_filename }}" -o "${{ inputs.output_filename }}"
+
+      - name: Verify output
+        run: |
+          if [ ! -f "${{ inputs.output_filename }}" ]; then
+            echo "[!] patched .deb not found — patch failed"
+            exit 1
+          fi
+          echo "[+] patched .deb:"
+          ls -lh "${{ inputs.output_filename }}"
+          dpkg-deb -I "${{ inputs.output_filename }}"
+
+      - name: Upload patched .deb as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_filename }}
+          path: ${{ inputs.output_filename }}
+          retention-days: 7
